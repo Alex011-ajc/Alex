@@ -1,4 +1,3 @@
-// models/User.js
 const mongoose = require('mongoose');
 const bcrypt   = require('bcryptjs');
 
@@ -17,7 +16,6 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    // No requerido para usuarios Google
   },
   googleId: String,
   isAdmin: {
@@ -26,11 +24,9 @@ const userSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Hashear contraseña antes de guardar
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password') || !this.password) return next();
   this.password = await bcrypt.hash(this.password, 12);
-  // Auto-asignar admin si el email está en la lista
   this.isAdmin = ADMIN_EMAILS.includes(this.email);
   next();
 });
