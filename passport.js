@@ -1,6 +1,5 @@
-// config/passport.js
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const User = require('../models/User');
+const User = require('./Usuario');
 
 const ADMIN_EMAILS = [
   '11alex.julio@inscollbato.cat',
@@ -16,7 +15,6 @@ module.exports = (passport) => {
     try {
       const email = profile.emails[0].value.toLowerCase();
       const isAdmin = ADMIN_EMAILS.includes(email);
-
       let user = await User.findOne({ googleId: profile.id });
       if (!user) {
         user = await User.findOne({ email });
@@ -24,11 +22,7 @@ module.exports = (passport) => {
           user.googleId = profile.id;
           await user.save();
         } else {
-          user = await User.create({
-            email,
-            googleId: profile.id,
-            isAdmin
-          });
+          user = await User.create({ email, googleId: profile.id, isAdmin });
         }
       }
       return done(null, user);
