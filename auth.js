@@ -1,51 +1,53 @@
-const express  = require('express');
-const jwt      = require('jsonwebtoken');
-const passport = require('passport');
-const User     = require('../models/User');
-const router   = express.Router();
+const express = require('express');
+const Anime   = require('../models/Anime');
+const { protect, adminOnly } = require('../middleware/auth');
+const router  = express.Router();
 
-const ADMIN_EMAILS = [
-  '11alex.julio@inscollbato.cat',
-  'alex137julio@gmail.com'
-];
-
-function generateToken(user) {
-  return jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-}
-
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ message: 'Email y contraseña requeridos.' });
-  if (!ADMIN_EMAILS.includes(email.toLowerCase()))
-    return res.status(403).json({ message: 'Este email no tiene permisos de admin.' });
+router.get('/', async (req, res) => {
   try {
-    let user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      user = new User({ email: email.toLowerCase(), password, isAdmin: true });
-      await user.save();
-    } else {
-      const match = await user.comparePassword(password);
-      if (!match) return res.status(401).json({ message: 'Contraseña incorrecta.' });
-    }
-    const token = generateToken(user);
-    res.json({ token, email: user.email, isAdmin: user.isAdmin });
+    const animes = await Anime.find().sort({ score: -1, createdAt: -1 });
+    res.json(animes);
   } catch (err) {
-    res.status(500).json({ message: 'Error del servidor.' });
+    res.status(500).json({ message: 'Error al obtener animes.' });
   }
 });
 
-router.get('/google',
-  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
-);
-
-router.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/?error=google' }),
-  (req, res) => {
-    const token = generateToken(req.user);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5500';
-    res.redirect(`${frontendUrl}?token=${token}&email=${req.user.email}`);
+router.post('/', protect, adminOnly, async (req, res) => {
+  const { name, image, description, score } = req.body;
+  if (!name) return res.status(400).json({ message: 'El nombre es obligatorio.' });
+  try {
+    const anime = new Anime({ name, image, description, score });
+    await anime.save();
+    res.status(201).json(anime);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
   }
-);
+});
+
+router.put('/:id', protect, adminOnly, async (req, res) => {
+  const { name, image, description, score } = req.body;
+  if (!name) return res.status(400).json({ message: 'El nombre es obligatorio.' });
+  try {
+    const anime = await Anime.findByIdAndUpdate(
+      req.params.id,
+      { name, image, description, score },
+      { new: true, runValidators: true }
+    );
+    if (!anime) return res.status(404).json({ message: 'Anime no encontrado.' });
+    res.json(anime);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.delete('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const anime = await Anime.findByIdAndDelete(req.params.id);
+    if (!anime) return res.status(404).json({ message: 'Anime no encontrado.' });
+    res.json({ message: 'Anime eliminado.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al eliminar.' });
+  }
+});
 
 module.exports = router;
